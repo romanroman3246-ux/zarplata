@@ -1,0 +1,790 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Учёт зарплаты</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#007bff">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, sans-serif; }
+  body { background: #f2f4f7; padding: 10px; color: #222; }
+
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+
+  .header button {
+    font-size: 20px;
+    padding: 8px 14px;
+    border: none;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+  }
+
+  .month-title {
+    font-size: 18px;
+    font-weight: bold;
+    text-align: center;
+    flex: 1;
+  }
+
+  .weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 4px;
+  }
+
+  .weekdays .we {
+    color: #d32f2f;
+    font-weight: bold;
+  }
+
+  .calendar {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+  }
+
+  .day {
+    background: #fff;
+    border-radius: 8px;
+    min-height: 58px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    cursor: pointer;
+    border: 1px solid #e0e0e0;
+    position: relative;
+  }
+
+  .day.empty {
+    background: transparent;
+    border: none;
+    cursor: default;
+  }
+
+  .day.today {
+    border: 2px solid #007bff;
+  }
+
+  .day.has-data {
+    background: #d6eaff;
+  }
+
+  .day.weekend-cell {
+    background: #fff3e0;
+    border-color: #ffcc80;
+  }
+
+  .day.weekend {
+    background: #ffe2d6;
+  }
+
+  .day .hours {
+    font-size: 11px;
+    color: #005bb5;
+    font-weight: bold;
+  }
+
+  .day .note-icon {
+    font-size: 10px;
+    position: absolute;
+    top: 2px;
+    right: 4px;
+  }
+
+  .total-card {
+    margin-top: 12px;
+    background: #fff;
+    border-radius: 10px;
+    padding: 14px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    font-size: 15px;
+  }
+
+  .total-card .big {
+    font-size: 20px;
+    font-weight: bold;
+    color: #007bff;
+    margin-top: 6px;
+  }
+
+  .total-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+
+  .modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+
+  .hidden {
+    display: none !important;
+  }
+
+  .modal {
+    background: #fff;
+    border-radius: 12px;
+    padding: 18px;
+    width: 90%;
+    max-width: 360px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+
+  .modal h3 {
+    font-size: 17px;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+
+  .modal label {
+    display: block;
+    margin-top: 10px;
+    font-size: 14px;
+    font-weight: bold;
+  }
+
+  .modal input[type="number"],
+  .modal select,
+  .modal textarea {
+    width: 100%;
+    padding: 10px;
+    margin-top: 4px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 16px;
+  }
+
+  .modal textarea {
+    resize: vertical;
+    min-height: 60px;
+  }
+
+  .modal-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .modal-buttons button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    cursor: pointer;
+  }
+
+  .btn-save {
+    background: #007bff;
+    color: #fff;
+  }
+
+  .btn-delete {
+    background: #ff4d4d;
+    color: #fff;
+  }
+
+  .btn-cancel {
+    background: #e0e0e0;
+    color: #333;
+  }
+
+  .hint {
+    font-size: 12px;
+    color: #666;
+    margin-top: 6px;
+    line-height: 1.3;
+  }
+
+  .file-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .file-buttons button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background: #4caf50;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+  }
+
+  .file-buttons button.restore {
+    background: #ff9800;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <button onclick="changeMonth(-1)">←</button>
+  <div class="month-title" id="monthTitle"></div>
+  <button onclick="changeMonth(1)">→</button>
+  <button onclick="openSettings()">⚙️</button>
+</div>
+
+<div class="weekdays">
+  <div>Пн</div>
+  <div>Вт</div>
+  <div>Ср</div>
+  <div>Чт</div>
+  <div>Пт</div>
+  <div class="we">Сб</div>
+  <div class="we">Вс</div>
+</div>
+
+<div class="calendar" id="calendar"></div>
+
+<div class="total-card">
+  <div class="total-row">
+    <span>Ставка за час:</span>
+    <b id="sumRate">0 ₽</b>
+  </div>
+
+  <div class="total-row">
+    <span>Всего часов:</span>
+    <b id="sumHours">0 ч</b>
+  </div>
+
+  <div class="total-row">
+    <span>Выходные часы:</span>
+    <b id="sumWeekendHours">0 ч</b>
+  </div>
+
+  <div class="total-row">
+    <span>Обычные дни:</span>
+    <b id="sumNormal">0 ₽</b>
+  </div>
+
+  <div class="total-row">
+    <span>Переработка:</span>
+    <b id="sumOvertime">0 ₽</b>
+  </div>
+
+  <div class="total-row">
+    <span>Выходные (×2):</span>
+    <b id="sumWeekendPay">0 ₽</b>
+  </div>
+
+  <div class="total-row">
+    <span>Вредность:</span>
+    <b id="sumHarm">0 ₽</b>
+  </div>
+
+  <div class="total-row">
+    <span>Премия:</span>
+    <b id="sumBonus">0 ₽</b>
+  </div>
+
+  <div class="total-row">
+    <span>НДФЛ:</span>
+    <b id="sumTax">0 ₽</b>
+  </div>
+
+  <div class="big">
+    К выплате: <span id="sumTotal">0 ₽</span>
+  </div>
+</div>
+
+<!-- Окно дня -->
+<div class="modal-backdrop hidden" id="dayModal">
+  <div class="modal">
+    <h3 id="dayModalTitle"></h3>
+
+    <label>Отработано часов</label>
+    <input type="number" id="dayHours" step="0.25" min="0" placeholder="Например 8.2">
+
+    <label>Тип дня</label>
+    <select id="dayType">
+      <option value="work">Рабочий</option>
+      <option value="weekend">Выходной (×2)</option>
+    </select>
+
+    <label>Заметка</label>
+    <textarea id="dayNote" placeholder="Например: объект №5, подменял коллегу"></textarea>
+
+    <div class="modal-buttons">
+      <button class="btn-delete" onclick="deleteDay()">Удалить</button>
+      <button class="btn-save" onclick="saveDay()">Сохранить</button>
+      <button class="btn-cancel" onclick="closeDayModal()">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- Окно настроек -->
+<div class="modal-backdrop hidden" id="settingsModal">
+  <div class="modal">
+    <h3>Настройки</h3>
+
+    <div class="hint">
+      Стоимость часа = Оклад ÷ Норма часов за месяц.<br>
+      Суббота и воскресенье автоматически считаются как выходные.
+    </div>
+
+    <label>Оклад за месяц (руб)</label>
+    <input type="number" id="setSalary" step="0.01" min="0">
+
+    <label>Норма часов за месяц</label>
+    <input type="number" id="setMonthNorm" step="0.5" min="0">
+
+    <label>Норма часов Пн–Чт</label>
+    <input type="number" id="setNormMonThu" step="0.25" min="0" value="8.2">
+
+    <label>Норма часов Пт</label>
+    <input type="number" id="setNormFri" step="0.25" min="0" value="7.2">
+
+    <label>Вредность (%)</label>
+    <input type="number" id="setHarmPercent" step="0.1" min="0">
+
+    <label>Премия (%)</label>
+    <input type="number" id="setBonusPercent" step="0.1" min="0">
+
+    <label>НДФЛ / удержание (%)</label>
+    <input type="number" id="setTax" step="0.1" min="0">
+
+    <label>Резервная копия</label>
+    <div class="file-buttons">
+      <button onclick="exportData()">Скачать</button>
+      <button class="restore" onclick="document.getElementById('importFile').click()">Загрузить</button>
+    </div>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importData(event)">
+
+    <div class="modal-buttons">
+      <button class="btn-save" onclick="saveSettings()">Сохранить</button>
+      <button class="btn-cancel" onclick="closeSettings()">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let currentYear;
+let currentMonth;
+let selectedDate = null;
+
+let data = {
+  settings: {
+    salary: 0,
+    monthNorm: 0,
+    normMonThu: 8.2,
+    normFri: 7.2,
+    harmPercent: 0,
+    bonusPercent: 0,
+    tax: 0
+  },
+  days: {}
+};
+
+const monthNames = [
+  "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
+  "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"
+];
+
+function loadData() {
+  const saved = localStorage.getItem("salaryData");
+
+  if (saved) {
+    try {
+      data = JSON.parse(saved);
+
+      if (!data.settings) data.settings = {};
+      if (!data.days) data.days = {};
+
+      if (data.settings.salary === undefined) data.settings.salary = 0;
+      if (data.settings.monthNorm === undefined) data.settings.monthNorm = 0;
+      if (data.settings.normMonThu === undefined) data.settings.normMonThu = 8.2;
+      if (data.settings.normFri === undefined) data.settings.normFri = 7.2;
+      if (data.settings.harmPercent === undefined) data.settings.harmPercent = 0;
+      if (data.settings.bonusPercent === undefined) data.settings.bonusPercent = 0;
+      if (data.settings.tax === undefined) data.settings.tax = 0;
+
+    } catch (e) {
+      console.log("Ошибка загрузки данных");
+    }
+  }
+}
+
+function saveData() {
+  localStorage.setItem("salaryData", JSON.stringify(data));
+}
+
+function money(v) {
+  return v.toLocaleString("ru-RU", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }) + " ₽";
+}
+
+function hoursText(v) {
+  return v.toLocaleString("ru-RU", {
+    maximumFractionDigits: 2
+  }) + " ч";
+}
+
+function init() {
+  const now = new Date();
+  currentYear = now.getFullYear();
+  currentMonth = now.getMonth();
+
+  loadData();
+  renderCalendar();
+}
+
+function changeMonth(delta) {
+  currentMonth += delta;
+
+  if (currentMonth < 0) {
+    currentMonth = 11;
+    currentYear--;
+  }
+
+  if (currentMonth > 11) {
+    currentMonth = 0;
+    currentYear++;
+  }
+
+  renderCalendar();
+}
+
+function dateKey(y, m, d) {
+  return y + "-" + String(m + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
+}
+
+function renderCalendar() {
+  document.getElementById("monthTitle").textContent =
+    monthNames[currentMonth] + " " + currentYear;
+
+  const calendar = document.getElementById("calendar");
+  calendar.innerHTML = "";
+
+  const firstDay = new Date(currentYear, currentMonth, 1);
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+  let startOffset = (firstDay.getDay() + 6) % 7;
+
+  for (let i = 0; i < startOffset; i++) {
+    const empty = document.createElement("div");
+    empty.className = "day empty";
+    calendar.appendChild(empty);
+  }
+
+  const today = new Date();
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const key = dateKey(currentYear, currentMonth, d);
+
+    const cell = document.createElement("div");
+    cell.className = "day";
+    cell.innerHTML = "<div>" + d + "</div>";
+
+    if (
+      today.getFullYear() === currentYear &&
+      today.getMonth() === currentMonth &&
+      today.getDate() === d
+    ) {
+      cell.classList.add("today");
+    }
+
+    const date = new Date(currentYear, currentMonth, d);
+    const weekday = date.getDay();
+
+    const isWeekendDay = (weekday === 6 || weekday === 0);
+
+    if (isWeekendDay) {
+      cell.classList.add("weekend-cell");
+    }
+
+    const entry = data.days[key];
+
+    if (entry && (entry.hours > 0 || entry.note)) {
+      cell.classList.add("has-data");
+
+      if (entry.type === "weekend") {
+        cell.classList.add("weekend");
+      }
+
+      if (entry.hours > 0) {
+        cell.innerHTML += '<div class="hours">' + entry.hours + " ч</div>";
+      }
+
+      if (entry.note) {
+        cell.innerHTML += '<div class="note-icon">📝</div>';
+      }
+    }
+
+    cell.onclick = function() {
+      openDayModal(key, d, weekday);
+    };
+
+    calendar.appendChild(cell);
+  }
+
+  updateTotals();
+}
+
+function openDayModal(key, dayNumber, weekday) {
+  selectedDate = key;
+
+  document.getElementById("dayModalTitle").textContent =
+    dayNumber + " " + monthNames[currentMonth].toLowerCase() + " " + currentYear;
+
+  const entry = data.days[key];
+
+  document.getElementById("dayHours").value = entry ? entry.hours : "";
+  document.getElementById("dayNote").value = entry && entry.note ? entry.note : "";
+
+  const isWeekendDay = (weekday === 6 || weekday === 0);
+
+  let type;
+  if (entry) {
+    type = entry.type;
+  } else {
+    type = isWeekendDay ? "weekend" : "work";
+  }
+
+  document.getElementById("dayType").value = type;
+
+  document.getElementById("dayModal").classList.remove("hidden");
+}
+
+function closeDayModal() {
+  document.getElementById("dayModal").classList.add("hidden");
+  selectedDate = null;
+}
+
+function saveDay() {
+  const hours = parseFloat(document.getElementById("dayHours").value) || 0;
+  const type = document.getElementById("dayType").value;
+  const note = document.getElementById("dayNote").value.trim();
+
+  if (hours <= 0 && note === "") {
+    delete data.days[selectedDate];
+  } else {
+    data.days[selectedDate] = {
+      hours: hours,
+      type: type,
+      note: note
+    };
+  }
+
+  saveData();
+  closeDayModal();
+  renderCalendar();
+}
+
+function deleteDay() {
+  delete data.days[selectedDate];
+  saveData();
+  closeDayModal();
+  renderCalendar();
+}
+
+function openSettings() {
+  document.getElementById("setSalary").value = data.settings.salary || 0;
+  document.getElementById("setMonthNorm").value = data.settings.monthNorm || 0;
+  document.getElementById("setNormMonThu").value = data.settings.normMonThu || 8.2;
+  document.getElementById("setNormFri").value = data.settings.normFri || 7.2;
+  document.getElementById("setHarmPercent").value = data.settings.harmPercent || 0;
+  document.getElementById("setBonusPercent").value = data.settings.bonusPercent || 0;
+  document.getElementById("setTax").value = data.settings.tax || 0;
+
+  document.getElementById("settingsModal").classList.remove("hidden");
+}
+
+function closeSettings() {
+  document.getElementById("settingsModal").classList.add("hidden");
+}
+
+function saveSettings() {
+  data.settings.salary = parseFloat(document.getElementById("setSalary").value) || 0;
+  data.settings.monthNorm = parseFloat(document.getElementById("setMonthNorm").value) || 0;
+  data.settings.normMonThu = parseFloat(document.getElementById("setNormMonThu").value) || 8.2;
+  data.settings.normFri = parseFloat(document.getElementById("setNormFri").value) || 7.2;
+  data.settings.harmPercent = parseFloat(document.getElementById("setHarmPercent").value) || 0;
+  data.settings.bonusPercent = parseFloat(document.getElementById("setBonusPercent").value) || 0;
+  data.settings.tax = parseFloat(document.getElementById("setTax").value) || 0;
+
+  saveData();
+  closeSettings();
+  renderCalendar();
+}
+
+function exportData() {
+  const json = JSON.stringify(data, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  const now = new Date();
+  const fileName = "zarplata-backup-" +
+    now.getFullYear() + "-" +
+    String(now.getMonth() + 1).padStart(2, "0") + "-" +
+    String(now.getDate()).padStart(2, "0") + ".json";
+
+  a.href = url;
+  a.download = fileName;
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+
+  reader.onload = function(e) {
+    try {
+      const imported = JSON.parse(e.target.result);
+
+      if (imported && imported.settings && imported.days) {
+        data = imported;
+        saveData();
+        closeSettings();
+        renderCalendar();
+        alert("Данные успешно загружены.");
+      } else {
+        alert("Файл не подходит. Выберите резервную копию этой программы.");
+      }
+    } catch (err) {
+      alert("Ошибка чтения файла.");
+    }
+  };
+
+  reader.readAsText(file);
+  event.target.value = "";
+}
+
+function updateTotals() {
+  const salary = data.settings.salary || 0;
+  const monthNorm = data.settings.monthNorm || 0;
+
+  const normMonThu = data.settings.normMonThu || 0;
+  const normFri = data.settings.normFri || 0;
+
+  const harmPercent = data.settings.harmPercent || 0;
+  const bonusPercent = data.settings.bonusPercent || 0;
+  const taxPercent = data.settings.tax || 0;
+
+  let rateHour = 0;
+
+  if (salary > 0 && monthNorm > 0) {
+    rateHour = salary / monthNorm;
+  }
+
+  let totalHours = 0;
+  let weekendHours = 0;
+
+  let normalPay = 0;
+  let overtimePay = 0;
+  let weekendPay = 0;
+
+  for (const key in data.days) {
+    const parts = key.split("-");
+    const y = Number(parts[0]);
+    const m = Number(parts[1]);
+    const d = Number(parts[2]);
+
+    if (y === currentYear && m === currentMonth + 1) {
+      const entry = data.days[key];
+      const hours = entry.hours || 0;
+
+      totalHours += hours;
+
+      if (entry.type === "weekend") {
+        weekendHours += hours;
+        weekendPay += hours * rateHour * 2;
+      } else {
+        const date = new Date(y, m - 1, d);
+        const weekday = date.getDay();
+
+        let dayNorm = 0;
+
+        if (weekday >= 1 && weekday <= 4) {
+          dayNorm = normMonThu;
+        } else if (weekday === 5) {
+          dayNorm = normFri;
+        } else {
+          dayNorm = normMonThu;
+        }
+
+        if (dayNorm <= 0 || hours <= dayNorm) {
+          normalPay += hours * rateHour;
+        } else {
+          normalPay += dayNorm * rateHour;
+
+          const overtime = hours - dayNorm;
+          const first2 = Math.min(overtime, 2);
+          const rest = Math.max(overtime - first2, 0);
+
+          overtimePay += first2 * rateHour * 1.5 + rest * rateHour * 2;
+        }
+      }
+    }
+  }
+
+  const harmPay = totalHours * rateHour * harmPercent / 100;
+  const bonusPay = totalHours * rateHour * bonusPercent / 100;
+
+  const total =
+    normalPay +
+    overtimePay +
+    weekendPay +
+    harmPay +
+    bonusPay;
+
+  const taxAmount = total * taxPercent / 100;
+  const toPay = total - taxAmount;
+
+  document.getElementById("sumRate").textContent = money(rateHour);
+  document.getElementById("sumHours").textContent = hoursText(totalHours);
+  document.getElementById("sumWeekendHours").textContent = hoursText(weekendHours);
+
+  document.getElementById("sumNormal").textContent = money(normalPay);
+  document.getElementById("sumOvertime").textContent = money(overtimePay);
+  document.getElementById("sumWeekendPay").textContent = money(weekendPay);
+
+  document.getElementById("sumHarm").textContent = money(harmPay);
+  document.getElementById("sumBonus").textContent = money(bonusPay);
+  document.getElementById("sumTax").textContent = money(taxAmount);
+  document.getElementById("sumTotal").textContent = money(toPay);
+}
+
+init();
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+
+</body>
+</html>
